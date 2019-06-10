@@ -11,25 +11,37 @@ const {
     PerformanceObserver
 } = require('perf_hooks');
 
+if(!process.env.COMPARE_DIR) {
+    console.log("Comparison directory is expected in environment variable COMPARE_DIR");
+    process.exit();
+}
 
-const regression_dir = 'regression_screenshots/';
-const overlay_dir = 'overlay_dir/';
-const regression_dir_compare = 'regression_screenshots_compare/';
-const diff_dir = 'regression_diff/';
+/**
+ * Create folders used to compare screenshots
+ */
+const root_dir = 'regression_screenshots/'; // Root folder that contains all current screenshots
+const original_dir = root_dir + 'original/'; // Location for all current screenshots
+const overlay_dir = root_dir + 'overlay/'; // Location for overlays (ex. to cover JS animations)
+const diff_dir = root_dir + 'diffs/'; // If there is a diff, screenshot showing diff stored here
+const composite_dir = root_dir + 'composite/'; 
+const compare_dir = process.env.COMPARE_DIR; // Location of old screenshots, should be argument
 
 var fs = require('fs');
-if(!fs.existsSync(regression_dir)) {
-    fs.mkdirSync(regression_dir);
+
+if(!fs.existsSync(root_dir)) {
+    fs.mkdirSync(root_dir);
+}
+
+if(!fs.existsSync(original_dir)) {
+    fs.mkdirSync(original_dir);
 }
 
 if(!fs.existsSync(diff_dir)) {
     fs.mkdirSync(diff_dir);
 }
 
-function _fieldExists(field) {
-    expect(field).toBeDefined();
-    expect(field.length).toBeGreaterThan(0);
-    expect(field[0]).toBeDefined();
+if(!fs.existsSync(composite_dir)) {
+    fs.mkdirSync(composite_dir);
 }
 
 async function apply_mask(source_dir, filename, alias) {
@@ -43,8 +55,8 @@ async function apply_mask(source_dir, filename, alias) {
             .composite([{ input: overlay_dir + filename, top: 0, left: 0 }])
             .toBuffer()
             .then(function(outputBuffer) {
-                fs.writeFileSync('test_dir/' + full_filename, outputBuffer);
-                img = PNG.sync.read(fs.readFileSync('test_dir/'+ full_filename))
+                fs.writeFileSync(composite_dir + full_filename, outputBuffer);
+                img = PNG.sync.read(fs.readFileSync(composite_dir + full_filename))
                 resolve(img);
             })
     
@@ -54,16 +66,27 @@ async function apply_mask(source_dir, filename, alias) {
         }
     })
 }
-// 6381 (live)
-// 6363 (compare) (18 pixels)
+
 function compareScreenshots(filename) {
     return new Promise((resolve, reject) => {
         console.log("Starting compare for " + filename + "...");
         performance.mark(`compare-${filename}-start`);
 
-        apply_mask(regression_dir, filename, 'image_1').then(function(img1) {
-            //const img2 = PNG.sync.read(fs.readFileSync(regression_dir_compare + filename));
-            apply_mask(regression_dir_compare, filename, 'image_2').then(function(img2) {
+        if(!fs.existsSync(original_dir + filename)) {
+            console.log("Original file does not exist: " + original_dir + filename);
+            reject("original file doesn't exist");
+            return;
+        }
+
+        if(!fs.existsSync(compare_dir + filename)) {
+            console.log("Compare file doesn't exist: " + compare_dir + filename);
+            reject("Compare file doesn't exist");
+            return;
+        }
+
+        apply_mask(original_dir, filename, 'image_1').then(function(img1) {
+            //const img2 = PNG.sync.read(fs.readFileSync(original_dir_compare + filename));
+            apply_mask(compare_dir, filename, 'image_2').then(function(img2) {
                 if(img1.width != img2.width || img1.height != img2.height) {
                     reject("Image sizes don't match");
                 }
@@ -110,7 +133,7 @@ describe('webpage regression testing', () => {
             var md5sum = crypto.createHash('md5');
             let hash = md5sum.update(url);
             let screenshot_filename = md5sum.digest('hex') + '.png';
-            await page.screenshot({path: regression_dir + screenshot_filename, fullPage: true});
+            await page.screenshot({path: original_dir + screenshot_filename, fullPage: true});
 
             let diff_pixels = await compareScreenshots(screenshot_filename);
             expect(diff_pixels).toBe(0);
