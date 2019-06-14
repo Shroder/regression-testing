@@ -19,11 +19,11 @@ if(!process.env.COMPARE_DIR) {
 /**
  * Create folders used to compare screenshots
  */
-const root_dir = 'regression_screenshots/'; // Root folder that contains all current screenshots
+const root_dir = process.env.ROOT_SCREENSHOT_DIR; // Location to put current screenshots
 const original_dir = root_dir + 'original/'; // Location for all current screenshots
 const overlay_dir = root_dir + 'overlay/'; // Location for overlays (ex. to cover JS animations)
 const diff_dir = root_dir + 'diffs/'; // If there is a diff, screenshot showing diff stored here
-const composite_dir = root_dir + 'composite/'; 
+const composite_dir = root_dir + 'composite/';
 const compare_dir = process.env.COMPARE_DIR; // Location of old screenshots, should be argument
 
 var fs = require('fs');
@@ -137,7 +137,7 @@ describe('webpage regression testing', () => {
             let screenshot_filename = md5sum.digest('hex') + '.png';
             await page.screenshot({path: original_dir + screenshot_filename, fullPage: true});
 
-            let diff_pixels = await compareScreenshots(screenshot_filename);
+            let diff_pixels = await compareScreenshots(screenshot_filename).catch(error => { console.log(error); return 0; });
             expect(diff_pixels).toBe(0);
             
             await browser.close();
