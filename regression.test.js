@@ -6,10 +6,10 @@ var PNG = require('pngjs').PNG;
 const pixelmatch = require('pixelmatch');
 const sharp = require("sharp")
 
-const {
-    performance,
-    PerformanceObserver
-} = require('perf_hooks');
+// const {
+//     performance,
+//     PerformanceObserver
+// } = require('perf_hooks');
 
 if(!process.env.COMPARE_DIR) {
     console.log("Comparison directory is expected in environment variable COMPARE_DIR");
@@ -70,7 +70,7 @@ async function apply_mask(source_dir, filename, alias) {
 function compareScreenshots(filename) {
     return new Promise((resolve, reject) => {
         console.log("Starting compare for " + filename + "...");
-        performance.mark(`compare-${filename}-start`);
+        // performance.mark(`compare-${filename}-start`);
 
         if(!fs.existsSync(original_dir + filename)) {
             console.log("Original file does not exist: " + original_dir + filename);
@@ -101,8 +101,8 @@ function compareScreenshots(filename) {
                 }
     
                 console.log("Completed compare for " + filename);
-                performance.mark(`compare-${filename}-stop`);
-                performance.measure(`Compare ${filename}`, `compare-${filename}-start`, `compare-${filename}-start`, `compare-${filename}-stop`)
+                //performance.mark(`compare-${filename}-stop`);
+                //performance.measure(`Compare ${filename}`, `compare-${filename}-start`, `compare-${filename}-start`, `compare-${filename}-stop`)
                 resolve(num_diff_pixels);
             })
         });        
@@ -110,6 +110,7 @@ function compareScreenshots(filename) {
 }
 
 describe('webpage regression testing', () => {
+    /*
     afterEach(() => {
         const obs = new PerformanceObserver((list, observer) => {
             console.log(list.getEntries()[0]);
@@ -118,6 +119,7 @@ describe('webpage regression testing', () => {
           });
           obs.observe({ entryTypes: ['measure'], buffered: true });
     })
+    */
 
     let webpages = [
         'https://shroder.github.io/regression-testing/',
