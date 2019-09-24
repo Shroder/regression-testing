@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "test": "jest"
+    "test": "dotenv jest --detectOpenHandles"
   },
   "dependencies": {
     "jest": "^24.8.0",

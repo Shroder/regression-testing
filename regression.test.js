@@ -13,7 +13,7 @@ const sharp = require("sharp")
 
 if(!process.env.COMPARE_DIR) {
     console.log("Comparison directory is expected in environment variable COMPARE_DIR");
-    process.exit();
+    process.exit(0);
 }
 
 /**
@@ -25,6 +25,17 @@ const overlay_dir = root_dir + 'overlay/'; // Location for overlays (ex. to cove
 const diff_dir = root_dir + 'diffs/'; // If there is a diff, screenshot showing diff stored here
 const composite_dir = root_dir + 'composite/';
 const compare_dir = process.env.COMPARE_DIR; // Location of old screenshots, should be argument
+
+console.log("\n\n\n");
+console.log("##############");
+console.log("Root Directory: ", root_dir);
+console.log("original_dir: ", original_dir);
+console.log("Overlay Dir: ", overlay_dir);
+console.log("Diff Dir: ", diff_dir);
+console.log("Composite Dir: ", composite_dir);
+console.log("Compare Dir: ", compare_dir);
+console.log("##############");
+console.log("\n\n\n");
 
 var fs = require('fs');
 
@@ -127,7 +138,7 @@ describe('webpage regression testing', () => {
     
     for(let i in webpages) {
         let url = webpages[i];
-        it('regression testing for ' + url, async () => {
+        it('regression testing for ' + url, async (done) => {
             const browser = await puppeteer.launch();
             const page = await browser.newPage();
             await page.goto(url);
@@ -137,10 +148,15 @@ describe('webpage regression testing', () => {
             let screenshot_filename = md5sum.digest('hex') + '.png';
             await page.screenshot({path: original_dir + screenshot_filename, fullPage: true});
 
-            let diff_pixels = await compareScreenshots(screenshot_filename).catch(error => { console.log(error); return 0; });
+            let diff_pixels = await compareScreenshots(screenshot_filename)
+            .catch(error => { 
+                done.fail(new Error(error));
+                return 0; 
+            });
             expect(diff_pixels).toBe(0);
             
             await browser.close();
+            done.resolve();
         });        
     }
 })
