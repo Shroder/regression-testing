@@ -1,4 +1,4 @@
-jest.setTimeout(30000);
+jest.setTimeout(60000);
 
 const puppeteer = require('puppeteer');
 const crypto = require('crypto');
@@ -24,18 +24,19 @@ const original_dir = root_dir + 'original/'; // Location for all current screens
 const overlay_dir = root_dir + 'overlay/'; // Location for overlays (ex. to cover JS animations)
 const diff_dir = root_dir + 'diffs/'; // If there is a diff, screenshot showing diff stored here
 const composite_dir = root_dir + 'composite/';
+const resize_dir = root_dir + 'resize/';
 const compare_dir = process.env.COMPARE_DIR; // Location of old screenshots, should be argument
 
-console.log("\n\n\n");
-console.log("##############");
-console.log("Root Directory: ", root_dir);
-console.log("original_dir: ", original_dir);
-console.log("Overlay Dir: ", overlay_dir);
-console.log("Diff Dir: ", diff_dir);
-console.log("Composite Dir: ", composite_dir);
-console.log("Compare Dir: ", compare_dir);
-console.log("##############");
-console.log("\n\n\n");
+// console.log("\n\n\n");
+// console.log("##############");
+// console.log("Root Directory: ", root_dir);
+// console.log("original_dir: ", original_dir);
+// console.log("Overlay Dir: ", overlay_dir);
+// console.log("Diff Dir: ", diff_dir);
+// console.log("Composite Dir: ", composite_dir);
+// console.log("Compare Dir: ", compare_dir);
+// console.log("##############");
+// console.log("\n\n\n");
 
 var fs = require('fs');
 
@@ -53,6 +54,10 @@ if(!fs.existsSync(diff_dir)) {
 
 if(!fs.existsSync(composite_dir)) {
     fs.mkdirSync(composite_dir);
+}
+
+if(!fs.existsSync(resize_dir)) {
+    fs.mkdirSync(resize_dir);
 }
 
 async function apply_mask(source_dir, filename, alias) {
@@ -76,6 +81,24 @@ async function apply_mask(source_dir, filename, alias) {
             resolve(img);
         }
     })
+}
+
+async function resizeImageMaxHeight(file_source, max_height, filename, alias) {
+    var options = { colorType: 6 };
+    let buffer = PNG.sync.write(file_source, options);
+    let full_filename = alias + '_' + file_source.width + "_" + max_height + " +" + filename;
+
+    
+    return await sharp(buffer)
+    .resize(file_source.width, max_height)
+    .toBuffer()
+    .then(function (outputBuffer) {
+        fs.writeFileSync(resize_dir + full_filename, outputBuffer);
+        img = PNG.sync.read(fs.readFileSync(resize_dir + full_filename));
+        console.log(img)
+        return img;
+    })
+
 }
 
 function compareScreenshots(filename) {
@@ -103,18 +126,28 @@ function compareScreenshots(filename) {
                 }
     
                 // Do the visual diff
-                const diff = new PNG({width: img1.width, height: img2.height});
-                const num_diff_pixels = pixelmatch(img1.data, img2.data, diff.data, img1.width, img1.height, {threshold: 0.1});
+                const max_image_height = Math.max(img1.height, img2.height)               
+                img1 = resizeImageMaxHeight(img1, max_image_height, filename, 'image_1');
+                img2 = resizeImageMaxHeight(img2, max_image_height, filename, 'image_2');
+
+                Promise.all([img1, img2])
+                .then(function (values) {
+                    img1 = values[0];
+                    img2 = values[1];
+
+                    const diff = new PNG({width: img1.width, height: max_image_height});
+                    const num_diff_pixels = pixelmatch(img1.data, img2.data, diff.data, img1.width, max_image_height, {threshold: 0.1});
+            
+                    if(num_diff_pixels > 0) {
+                        console.log(filename + " diffs found");
+                        fs.writeFileSync(diff_dir + filename, PNG.sync.write(diff));
+                    }
         
-                if(num_diff_pixels > 0) {
-                    console.log(filename + " diffs found");
-                    fs.writeFileSync(diff_dir + filename, PNG.sync.write(diff));
-                }
-    
-                console.log("Completed compare for " + filename);
-                //performance.mark(`compare-${filename}-stop`);
-                //performance.measure(`Compare ${filename}`, `compare-${filename}-start`, `compare-${filename}-start`, `compare-${filename}-stop`)
-                resolve(num_diff_pixels);
+                    console.log("Completed compare for " + filename);
+                    //performance.mark(`compare-${filename}-stop`);
+                    //performance.measure(`Compare ${filename}`, `compare-${filename}-start`, `compare-${filename}-start`, `compare-${filename}-stop`)
+                    resolve(num_diff_pixels);
+                });
             })
         });        
     })
@@ -138,7 +171,7 @@ describe('webpage regression testing', () => {
     
     for(let i in webpages) {
         let url = webpages[i];
-        it('regression testing for ' + url, async (done) => {
+        it('regression testing for ' + url, async () => {
             const browser = await puppeteer.launch();
             const page = await browser.newPage();
             await page.goto(url);
@@ -150,13 +183,13 @@ describe('webpage regression testing', () => {
 
             let diff_pixels = await compareScreenshots(screenshot_filename)
             .catch(error => { 
-                done.fail(new Error(error));
+                console.log("### Error while getting different pixels");
+                console.log(error); 
                 return 0; 
             });
             expect(diff_pixels).toBe(0);
             
             await browser.close();
-            done.resolve();
         });        
     }
 })
