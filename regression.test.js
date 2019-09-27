@@ -95,7 +95,6 @@ async function resizeImageMaxHeight(file_source, max_height, filename, alias) {
     .then(function (outputBuffer) {
         fs.writeFileSync(resize_dir + full_filename, outputBuffer);
         img = PNG.sync.read(fs.readFileSync(resize_dir + full_filename));
-        console.log(img)
         return img;
     })
 
@@ -103,17 +102,17 @@ async function resizeImageMaxHeight(file_source, max_height, filename, alias) {
 
 function compareScreenshots(filename) {
     return new Promise((resolve, reject) => {
-        console.log("Starting compare for " + filename + "...");
+        //console.log("Starting compare for " + filename + "...");
         // performance.mark(`compare-${filename}-start`);
 
         if(!fs.existsSync(original_dir + filename)) {
-            console.log("Original file does not exist: " + original_dir + filename);
+            //console.log("Original file does not exist: " + original_dir + filename);
             reject("original file doesn't exist");
             return;
         }
 
         if(!fs.existsSync(compare_dir + filename)) {
-            console.log("Compare file doesn't exist: " + compare_dir + filename);
+            //console.log("Compare file doesn't exist: " + compare_dir + filename);
             reject("Compare file doesn't exist");
             return;
         }
@@ -121,7 +120,7 @@ function compareScreenshots(filename) {
         apply_mask(original_dir, filename, 'image_1').then(function(img1) {
             //const img2 = PNG.sync.read(fs.readFileSync(original_dir_compare + filename));
             apply_mask(compare_dir, filename, 'image_2').then(function(img2) {
-                if(img1.width != img2.width || img1.height != img2.height) {
+                if(img1.width != img2.width) {
                     reject("Image sizes don't match");
                 }
     
@@ -137,23 +136,46 @@ function compareScreenshots(filename) {
 
                     const diff = new PNG({width: img1.width, height: max_image_height});
                     const num_diff_pixels = pixelmatch(img1.data, img2.data, diff.data, img1.width, max_image_height, {threshold: 0.1});
-            
+
                     if(num_diff_pixels > 0) {
-                        console.log(filename + " diffs found");
+                        //console.log(filename + " diffs found");
                         fs.writeFileSync(diff_dir + filename, PNG.sync.write(diff));
                     }
-        
-                    console.log("Completed compare for " + filename);
+   
+                    //console.log("Completed compare for " + filename);
                     //performance.mark(`compare-${filename}-stop`);
                     //performance.measure(`Compare ${filename}`, `compare-${filename}-start`, `compare-${filename}-start`, `compare-${filename}-stop`)
                     resolve(num_diff_pixels);
+                })
+                .catch(function () {
+                    reject("Failed while comparing images");
                 });
             })
+            .catch(function () {
+                reject("Failed while applying second mask");
+            })
+        })
+        .catch(function () {
+            reject("Failed while applying first mask");
         });        
     })
 }
 
 describe('webpage regression testing', () => {
+    let browser;
+
+    async function init_webpage() {
+        //browser = await puppeteer.launch();
+    }
+    
+    beforeEach(() => {
+        //Promise.all([init_webpage()])
+    })
+
+    afterEach(() => {
+        //Promise.all([browser.close()])
+    })
+
     /*
     afterEach(() => {
         const obs = new PerformanceObserver((list, observer) => {
@@ -171,25 +193,28 @@ describe('webpage regression testing', () => {
     
     for(let i in webpages) {
         let url = webpages[i];
-        it('regression testing for ' + url, async () => {
+        it('regression testing for ' + url, async (done) => {
             const browser = await puppeteer.launch();
-            const page = await browser.newPage();
-            await page.goto(url);
-                
+
+            const webpage = await browser.newPage();    
+            await webpage.goto(url);
+         
             var md5sum = crypto.createHash('md5');
             let hash = md5sum.update(url);
             let screenshot_filename = md5sum.digest('hex') + '.png';
-            await page.screenshot({path: original_dir + screenshot_filename, fullPage: true});
+            await webpage.screenshot({path: original_dir + screenshot_filename, fullPage: true});
+            await browser.close();
 
             let diff_pixels = await compareScreenshots(screenshot_filename)
             .catch(error => { 
-                console.log("### Error while getting different pixels");
                 console.log(error); 
                 return 0; 
             });
+           
             expect(diff_pixels).toBe(0);
+
             
-            await browser.close();
+            done();
         });        
     }
 })
